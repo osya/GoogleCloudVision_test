@@ -1,32 +1,26 @@
-from googleapiclient import discovery
+import argparse
 import base64
-import requests
-import json
-from oauth2client.client import GoogleCredentials
+import logging
+import httplib2
+from apiclient.discovery import build
 
 
 class GCVWrapper:
     __base64_image = ''
-    __key = ''
+    __url = 'https://{api}.googleapis.com/$discovery/rest?version={apiVersion}'
+    __service = None
 
     def __init__(self, _filename, _key):
         with open(_filename, 'rb') as image_file:
             self.__base64_image = self.encode_image(image_file)
-        self.__key = _key
+        self.__service = build('vision', 'v1', httplib2.Http(), discoveryServiceUrl=self.__url, developerKey=_key)
 
     @staticmethod
     def get_batch_request(_content, _type):
-        return json.dumps(
-            {'requests': [{
-                'image': {
-                    'content': _content
-                },
-                'features': [{
-                    'type': _type,
-                    'maxResults': 1,
-                }]
-            }]}
-        )
+        return {'requests': [{
+            'image': {'content': _content},
+            'features': [{'type': _type, 'maxResults': 1}]
+        }]}
 
     @staticmethod
     def encode_image(image):
@@ -40,25 +34,24 @@ class GCVWrapper:
 
     def label_detection(self):
         batch_request = self.get_batch_request(self.__base64_image, 'LABEL_DETECTION')
-        url = 'https://vision.googleapis.com/v1/images:annotate?key=%s' % self.__key
-        headers = {'Content-type': 'application/json'}
-        r = requests.post(url, headers=headers, data=batch_request)
-        return r.text
-
-    def get_vision_service(self):
-        discovery_url = 'https://{api}.googleapis.com/$discovery/rest?version={apiVersion}?key=%s' % self.__key
-        credentials = GoogleCredentials.get_application_default()
-        return discovery.build('vision', 'v1', credentials=credentials,
-                               discoveryServiceUrl=discovery_url)
+        request = self.__service.images().annotate(body=batch_request)
+        response = request.execute()
+        return response
 
     def face_detection(self):
         batch_request = self.get_batch_request(self.__base64_image, 'FACE_DETECTION')
-        service = self.get_vision_service()
-        request = service.images().annotate(body=batch_request)
+        request = self.__service.images().annotate(body=batch_request)
         response = request.execute()
         return response['responses'][0]['faceAnnotations']
 
 
-w = GCVWrapper('faulkner.jpg', 'AIzaSyDB2P8s2YMH3idk_vHsBRi2hdk4-DoGrGg')
-# print w.label_detection()
-print w.face_detection()
+if __name__ == '__main__':
+    logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("key", help='API key')
+    parser.add_argument("-i", help='image file name')
+    args = parser.parse_args()
+    w = GCVWrapper(args.i if args.i else 'image.jpg', args.key)
+    # res = w.label_detection()
+    res = w.face_detection()
+    print res
