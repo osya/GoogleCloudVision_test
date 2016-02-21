@@ -9,17 +9,18 @@ class GCVWrapper:
     __base64_image = ''
     __url = 'https://{api}.googleapis.com/$discovery/rest?version={apiVersion}'
     __service = None
+    __max_results = 1
 
-    def __init__(self, _filename, _key):
+    def __init__(self, _filename, _key, _max_results):
         with open(_filename, 'rb') as image_file:
             self.__base64_image = self.encode_image(image_file)
         self.__service = build('vision', 'v1', httplib2.Http(), discoveryServiceUrl=self.__url, developerKey=_key)
+        self.__max_results = _max_results
 
-    @staticmethod
-    def get_batch_request(_content, _type):
+    def get_batch_request(self, _content, _type):
         return {'requests': [{
             'image': {'content': _content},
-            'features': [{'type': _type, 'maxResults': 1}]
+            'features': [{'type': _type, 'maxResults': self.__max_results}]
         }]}
 
     @staticmethod
@@ -47,11 +48,12 @@ class GCVWrapper:
 
 if __name__ == '__main__':
     logging.basicConfig(filename='debug.log', level=logging.DEBUG)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("key", help='API key')
-    parser.add_argument("-i", help='image file name')
-    args = parser.parse_args()
-    w = GCVWrapper(args.i if args.i else 'image.jpg', args.key)
-    # res = w.label_detection()
-    res = w.face_detection()
+    p = argparse.ArgumentParser()
+    p.add_argument("-k", dest='api_key', help='API key', required=True)
+    p.add_argument('-i', dest="image_path", help='path to image', required=True)
+    p.add_argument('--max-results', default=1)
+    args = p.parse_args()
+    w = GCVWrapper(args.i if args.i else 'image.jpg', args.api_key, args.max_results)
+    res = w.label_detection()
+    # res = w.face_detection()
     print res
