@@ -3,7 +3,7 @@ import argparse
 import base64
 import logging
 import httplib2
-from apiclient.discovery import build
+from googleapiclient.discovery import build
 from PIL import Image, ImageDraw
 
 
